@@ -117,14 +117,15 @@ class WebScraperDatabase():
                 phrase = self.phrases[j]
                 input_element.send_keys(phrase + Keys.ENTER)
 
+
             WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.ID, "printHistoryTable"))
             )
 
             results = []
             tr_elements = self.driver.find_element(By.ID, 'printHistoryTable').find_elements(By.TAG_NAME, 'tr')[1:]
-            for tr in tr_elements:
-                td_elements = tr.find_elements(By.TAG_NAME, 'td')
+            for j in range(5):
+                td_elements = tr_elements[j].find_elements(By.TAG_NAME, 'td')
                 cipher_results = []
                 for td in td_elements:
                     if td.get_attribute('class') == 'HistorySum':
@@ -138,6 +139,8 @@ class WebScraperDatabase():
                 writer = csv.writer(f)
                 writer.writerows([phrase] + result for phrase, result in zip(self.phrases[(i-1)*5: i*5], results))
             
+            
+
     def run(self, ciphers: list[str] = ['chaldean']) -> None:
         """
         Runs the scraper class
