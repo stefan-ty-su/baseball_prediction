@@ -11,11 +11,12 @@ import time
 
 class WebScraper():
 
-    def __init__(self, exec_path: str = 'chromedriver.exe') -> None:
+    def __init__(self, date: datetime.date, exec_path: str = 'chromedriver.exe') -> None:
         """
         WebScraper class, takes path for browser driver executable
 
         Arguments:
+        date -- date which the scraper will scrape for
         exec_path -- path of the driver's executable
 
         Returns:
@@ -39,10 +40,14 @@ class WebScraper():
 
         self.service = Service(executable_path=exec_path)
         self.driver = webdriver.Chrome(service=self.service)
+        self.date = date
         self.phrases = []
         self.phrase_results = []
+        self.phrase_dict = dict()
 
-    def generate_phrases(self, date: datetime.date) -> None:
+        self.date_stats = dict()
+
+    def generate_phrases(self) -> None:
         """
         Generates the list of phrases to be input into gematrinator.
         List of phrases is assigned to class variable 'phrases'
@@ -54,13 +59,13 @@ class WebScraper():
         None
         """
         # Obtaining all 'words'
-        day_of_month = date.strftime('%d') # e.g. 25
+        day_of_month = self.date.strftime('%d') # e.g. 25
         day_of_month_ordinal = self._ordinal_suffix(day_of_month) # e.g. 25th
         day_of_month_words = num2words(int(day_of_month), to='ordinal') # twenty-five
 
-        day_of_week = date.strftime('%A') # e.g. Monday
-        month = date.strftime('%B') # e.g. January
-        year = date.strftime('%Y') # e.g. 2005
+        day_of_week = self.date.strftime('%A') # e.g. Monday
+        month = self.date.strftime('%B') # e.g. January
+        year = self.date.strftime('%Y') # e.g. 2005
 
         moon_sign = self.obtain_moon_sign(day_of_month, month, year) # e.g. Gemini
         planets = self.zodiac_to_planet[moon_sign]
@@ -76,8 +81,9 @@ class WebScraper():
         self.phrases.append(f'{moon_sign}')
         self.phrases.append(f'moon in {moon_sign}')
         self.phrases.append(f'{day_of_week}')
+        self.phrases.extend(['pi', 'sweep', 'comeback'])
 
-    def enter_phrases(self) -> None:
+    def enter_phrases(self, ciphers: list[str] = ['chaldean']) -> None:
         """
         Inputs phrases into provided input element
 
@@ -88,7 +94,7 @@ class WebScraper():
         None
         """
         self.driver.get("https://gematrinator.com/calculator")
-        self.add_ciphers(['chaldean'])
+        self.add_ciphers(ciphers)
 
         WebDriverWait(self.driver, 10).until(
             EC.element_to_be_clickable((By.ID, "EntryField"))
@@ -194,12 +200,66 @@ class WebScraper():
             for td in td_elements:
                 if td.get_attribute('class') == 'HistorySum':
                     cipher_result = td.find_element(By.ID, 'finalBreakNum').text
-                    cipher_results.append(int(cipher_result))
+                    cipher_results.append(cipher_result)
             self.phrase_results.append(cipher_results)
         
-        print(self.phrase_results)
+        self.phrase_results.reverse()
+        self.phrase_dict = {phrase: result for phrase, result in zip(self.phrases, self.phrase_results)}
+        # print(self.phrase_dict)
 
-    def run(self) -> None:
+    def get_date_stats(self) -> None:
+        """
+        Obtains date statistics
+
+        """
+        self.driver.get("https://gematrinator.com/date-calculator")
+
+        WebDriverWait(self.driver, 10).until(
+            EC.element_to_be_clickable((By.ID, "Month1"))
+        )
+        
+        # Inputting Date 1 (Start of date year)
+        input_element = self.driver.find_element(By.ID, "Month1")
+        input_element.clear()
+        input_element.send_keys('1')
+
+        input_element = self.driver.find_element(By.ID, "Day1")
+        input_element.clear()
+        input_element.send_keys('1')
+
+        input_element = self.driver.find_element(By.ID, "Year1")
+        input_element.clear()
+        input_element.send_keys(datetime.strftime(self.date, '%Y'))
+
+
+        # Inputting Date 2 (self.date)
+        print(datetime.strftime(self.date, '%d'))
+        input_element = self.driver.find_element(By.ID, "Month2")
+        input_element.clear()
+        input_element.send_keys(str(int(datetime.strftime(self.date, '%m'))))
+
+        input_element = self.driver.find_element(By.ID, "Day2")
+        input_element.clear()
+        input_element.send_keys(str(int(datetime.strftime(self.date, '%d'))))
+
+        input_element = self.driver.find_element(By.ID, "Year2")
+        input_element.clear()
+        input_element.send_keys(datetime.strftime(self.date, '%Y'))
+        
+        # Retrieving stats from table
+        table_element = self.driver.find_elements(By.CLASS_NAME, 'ClassicDateTable')[1]
+        tr_elements = table_element.find_element(By.TAG_NAME, 'tbody').find_elements(By.TAG_NAME, 'tr')
+        for tr in tr_elements:
+            key = tr.find_element(By.CLASS_NAME, 'NumString').text
+            value = tr.find_element(By.CLASS_NAME, 'SumString').text
+            self.date_stats[key] = [value, 'NA']
+
+        duration_elements = self.driver.find_elements(By.CLASS_NAME, 'DurNum')
+        self.date_stats['Months Days'] = [duration_elements[8].text, duration_elements[9].text]
+        self.date_stats['Weeks Days'] = [duration_elements[10].text, duration_elements[11].text]
+        self.date_stats['Days'] = [duration_elements[12].text, 'NA']
+
+    def run(self, ciphers: list[str] = ['chaldean']) -> None:
         """
         Runs the scraper class
 
@@ -209,9 +269,11 @@ class WebScraper():
         Returns:
         None
         """
-        self.generate_phrases(datetime.strptime('02/01/2025', '%d/%m/%Y'))
-        self.enter_phrases()
+        self.generate_phrases()
+        self.enter_phrases(ciphers)
         self.read_phrase_results()
+
+        self.get_date_stats()
 
         self.driver.quit()
 
@@ -237,6 +299,80 @@ class WebScraper():
         else:
             return numberStr + 'th'
 
+class NumberCounter():
+
+    def __init__(self, date: datetime.date, phrase_results: list[list[str]], date_stats: dict) -> None:
+        """
+        Number Counter class, performs number counting and ranking.
+        Also does any additional number modifications (e.g. removing 0s)
+
+        Arguments:
+        date -- the date being analysed
+        phrase_results -- a 2d array of numbers in string format
+        date_stats -- statistics of the date
+
+        Returns:
+        None
+        """
+        self.date = date
+        self.results = [number for result in phrase_results for number in result]
+        self.date_stats = [num for stat in date_stats.values() for num in stat]
+        self.date_stats = [num for num in self.date_stats if num != '0']
+
+        self.add_additional_numbers()
+
+        self.counter = dict()
+        self.count_nums()
+
+    def add_additional_numbers(self) -> None:
+        """
+        Adds all other additional numbers
+
+        Arguments:
+        None
+
+        Returns:
+        None
+        """
+        self.all_nums = self.results + self.date_stats
+        for num in self.results + self.date_stats:
+            new_num = num.replace('0', '')
+            if new_num != num:
+                self.all_nums.append(new_num)
+        self.all_nums = [num for num in self.all_nums if num != 'NA']
+    
+    def count_nums(self) -> None:
+        """
+        Counts the number of occurrences of numbers, records into self.counter
+
+        Arguments:
+        None
+
+        Returns:
+        None
+        """
+        for num in self.all_nums:
+            if num in self.counter:
+                self.counter[num] = self.counter[num] + 1
+            else:
+                self.counter[num] = 1
+
+    def display_nums(self, ranked: bool=True) -> list[tuple]:
+        """
+        Displays nums as tuples
+
+        Arguments:
+        ranked -- displays numbers in descending order if True
+
+        Returns:
+        None
+        """
+        nums_tuple = list(zip(self.counter.keys(), self.counter.values()))
+        if ranked:
+            nums_tuple.sort(key=lambda x: x[1], reverse=True)
+        return [tup for tup in nums_tuple if tup[1] > 1]
+
+
 if __name__=="__main__":
     # service = Service(executable_path='chromedriver.exe')
     # driver = webdriver.Chrome(service=service)
@@ -254,6 +390,8 @@ if __name__=="__main__":
     # time.sleep(3)
 
     # driver.quit()
-
-    ws = WebScraper()
+    date = datetime.strptime('03/01/2025', '%d/%m/%Y')
+    ws = WebScraper(date)
     ws.run()
+    nc = NumberCounter(date, ws.phrase_results, ws.date_stats)
+    print(nc.display_nums())
