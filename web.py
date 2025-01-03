@@ -40,6 +40,7 @@ class WebScraper():
         self.service = Service(executable_path=exec_path)
         self.driver = webdriver.Chrome(service=self.service)
         self.phrases = []
+        self.phrase_results = []
 
     def generate_phrases(self, date: datetime.date) -> None:
         """
@@ -171,6 +172,33 @@ class WebScraper():
                 return moon_sign
         return ''
 
+    def read_phrase_results(self) -> None:
+        """
+        Reads the results of the phrases from gematrinator
+
+        Arguments:
+        None
+
+        Returns:
+        None
+        """
+
+        WebDriverWait(self.driver, 10).until(
+            EC.element_to_be_clickable((By.ID, "printHistoryTable"))
+        )
+
+        tr_elements = self.driver.find_element(By.ID, 'printHistoryTable').find_elements(By.TAG_NAME, 'tr')[1:]
+        for tr in tr_elements:
+            td_elements = tr.find_elements(By.TAG_NAME, 'td')
+            cipher_results = []
+            for td in td_elements:
+                if td.get_attribute('class') == 'HistorySum':
+                    cipher_result = td.find_element(By.ID, 'finalBreakNum').text
+                    cipher_results.append(int(cipher_result))
+            self.phrase_results.append(cipher_results)
+        
+        print(self.phrase_results)
+
     def run(self) -> None:
         """
         Runs the scraper class
@@ -183,8 +211,8 @@ class WebScraper():
         """
         self.generate_phrases(datetime.strptime('02/01/2025', '%d/%m/%Y'))
         self.enter_phrases()
+        self.read_phrase_results()
 
-        time.sleep(25)
         self.driver.quit()
 
     def _ordinal_suffix(self, numberStr: str) -> str:
