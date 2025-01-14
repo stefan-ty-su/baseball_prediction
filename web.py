@@ -7,6 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
 from num2words import num2words
 import time
+import csv
 
 
 class WebScraper():
@@ -81,7 +82,7 @@ class WebScraper():
         self.phrases.append(f'{moon_sign}')
         self.phrases.append(f'moon in {moon_sign}')
         self.phrases.append(f'{day_of_week}')
-        self.phrases.extend(['pi', 'sweep', 'comeback'])
+        self.phrases.extend(['pi', 'kill', 'sweep', 'comeback'])
 
     def enter_phrases(self, ciphers: list[str] = ['chaldean']) -> None:
         """
@@ -178,7 +179,7 @@ class WebScraper():
                 return moon_sign
         return ''
 
-    def read_phrase_results(self) -> None:
+    def read_phrase_results(self, team1_name: str, team2_name: str) -> None:
         """
         Reads the results of the phrases from gematrinator
 
@@ -204,6 +205,25 @@ class WebScraper():
             self.phrase_results.append(cipher_results)
         
         self.phrase_results.reverse()
+
+        phrases = []
+        results = []
+        counter = 5
+        with open('team_nums.csv', 'r') as f:
+            reader = csv.reader(f)
+            for row in reader:
+
+                if row[0] == team1_name or row[0] == team2_name:
+                    phrases.append(row[0])
+                    results.append(row[1:])
+                    counter = 1
+                elif counter < 5:
+                    phrases.append(row[0])
+                    results.append(row[1:])
+                    counter += 1
+        
+        self.phrase_results.extend(results)
+        self.phrases.extend(phrases)
         self.phrase_dict = {phrase: result for phrase, result in zip(self.phrases, self.phrase_results)}
         # print(self.phrase_dict)
 
@@ -259,7 +279,7 @@ class WebScraper():
         self.date_stats['Weeks Days'] = [duration_elements[10].text, duration_elements[11].text]
         self.date_stats['Days'] = [duration_elements[12].text, 'NA']
 
-    def run(self, ciphers: list[str] = ['chaldean']) -> None:
+    def run(self, team1_name: str, team2_name: str, ciphers: list[str] = ['chaldean']) -> None:
         """
         Runs the scraper class
 
@@ -271,7 +291,7 @@ class WebScraper():
         """
         self.generate_phrases()
         self.enter_phrases(ciphers)
-        self.read_phrase_results()
+        self.read_phrase_results(team1_name, team2_name)
 
         self.get_date_stats()
 
@@ -357,7 +377,7 @@ class NumberCounter():
             else:
                 self.counter[num] = 1
 
-    def display_nums(self, ranked: bool=True) -> list[tuple]:
+    def display_nums(self, ranked: bool=True, significance: int = 2) -> list[tuple]:
         """
         Displays nums as tuples
 
@@ -370,7 +390,7 @@ class NumberCounter():
         nums_tuple = list(zip(self.counter.keys(), self.counter.values()))
         if ranked:
             nums_tuple.sort(key=lambda x: x[1], reverse=True)
-        return [tup for tup in nums_tuple if tup[1] > 1]
+        return [tup for tup in nums_tuple if tup[1] >= significance]
 
 
 if __name__=="__main__":
@@ -390,8 +410,9 @@ if __name__=="__main__":
     # time.sleep(3)
 
     # driver.quit()
-    date = datetime.strptime('03/01/2025', '%d/%m/%Y')
-    ws = WebScraper(date)
-    ws.run()
-    nc = NumberCounter(date, ws.phrase_results, ws.date_stats)
-    print(nc.display_nums())
+    # date = datetime.strptime('03/01/2025', '%d/%m/%Y')
+    # ws = WebScraper(date)
+    # ws.run()
+    # nc = NumberCounter(date, ws.phrase_results, ws.date_stats)
+    # print(nc.display_nums())
+    pass
